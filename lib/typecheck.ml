@@ -21,7 +21,7 @@ type expr =
   | If of expr * expr * expr
 
 (** A typing context is a map from variable names to types, implemented as an 
-    association list *)  
+    association list *)
 type context = (string * typ) list
 
 (** Exception to be thrown when:
@@ -52,10 +52,11 @@ let rec string_of_type (t : typ) : string =
       | TFun (_, _) -> "(" ^ string_of_type t1 ^ ")"
       | _ -> string_of_type t1 in
     t1_str ^ " -> " ^ string_of_type t2
-  | TVar n -> "'" ^ String.make 1 (Char.chr (97 + (n mod 26)))
-(* 'a, 'b, ... *)
+  | TVar n ->
+    (* 'a, 'b, ... *)
+    "'" ^ String.make 1 (Char.chr (97 + (n mod 26)))
 
-(** checks if a type variable occurs in a type *)
+(** Checks if a type variable occurs in a type *)
 let rec occurs (var_id : int) (t : typ) : bool =
   match t with
   | TVar n -> n = var_id
@@ -87,18 +88,31 @@ let compose_subst (s1 : sub) (s2 : sub) : sub =
 
 (** Implementation of Robinson's unification algorithm. Returns a substitution 
     that most weakly unifies the constraint (t1 = t2) for types t1, t2. *)
-let rec unify (t1 : typ) (t2 : typ) : sub = 
-  match t1, t2 with 
+let rec unify (t1 : typ) (t2 : typ) : sub =
+  match (t1, t2) with
   | TInt, TInt | TBool, TBool | TUnit, TUnit -> []
   | TVar x1, TVar x2 when x1 = x2 -> []
-  | TVar x, _ -> [(x, t2)]
-  | TFun (tau1, tau2), TFun (tau1', tau2') -> 
+  | TVar x, tau ->
+    if not (occurs x tau) then [(x, tau)]
+    else
+      raise
+        (TypeError
+           (Printf.sprintf "Type variable %d appears in %s\n" x
+              (string_of_type tau)))
+  | TFun (tau1, tau2), TFun (tau1', tau2') ->
     (* TODO: need to check this case *)
     compose_subst (unify tau1 tau1') (unify tau2 tau2')
-  | _ -> 
-    let s1 = string_of_type t1 in 
-    let s2 = string_of_type t2 in 
+  | _ ->
+    let s1 = string_of_type t1 in
+    let s2 = string_of_type t2 in
     raise (TypeError (Printf.sprintf "No solution for %s = %s\n" s1 s2))
+
+(** Robinson's algorithm -- applies [unify] to a list of equations
+    (represented as an association list containing pairs of [typ]s) *)    
+let rec robinson (eqs : (typ * typ) list) : sub =
+  match eqs with
+  | [] -> []
+  | (t1, t2) :: rest -> compose_subst (unify t1 t2) (robinson rest)
 
 (** Looks-up a variable in the context, returning its type.
     Raises [TypeError] if the variable is not found. *)
@@ -116,7 +130,7 @@ let rec lookup (ctx : context) (x : string) : typ =
  *    satisfied for e to be of type t.
  *)
 let rec infer (ctx : context) (e : expr) : typ * sub =
-  match e with 
+  match e with
   | Bool b -> (TBool, [])
   | Int n -> (TInt, [])
   | Null -> (TUnit, [])

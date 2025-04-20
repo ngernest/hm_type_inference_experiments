@@ -34,7 +34,7 @@ val fresh_var : unit -> typ
 (** converts a type to string for display *)
 val string_of_type : typ -> string
 
-(** checks if a type variable occurs in a type *)
+(** Checks if a type variable occurs in a type *)
 val occurs : int -> typ -> bool
 
 (** A substitution is an association list that maps type variables (ints) to 
