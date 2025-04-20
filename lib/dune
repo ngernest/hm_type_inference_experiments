@@ -1,0 +1,8 @@
+(library
+ (name typecheck))
+
+;; TODO: remove these compiler flags
+(env
+ (dev
+  (flags
+   (:standard -g -w "-27-39")))) 
