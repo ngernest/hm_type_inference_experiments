@@ -21,6 +21,11 @@ type expr =
     association list *)
 type context = (string * typ) list
 
+(** Helper function: extends a context [ctx] with a new binding [x : ty].    
+    If a binding for [x] already exists in [ctx], that binding is overwritten
+    with the new binding [x : ty]. *)
+val extend_ctx : context -> string -> typ -> context
+
 (** Exception to be thrown when:
     - a variable doesn't exist in a typing context
     - two types can't be unified 
