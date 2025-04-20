@@ -27,8 +27,8 @@ type context = (string * typ) list
 (** Helper function: extends a context [ctx] with a new binding [x : ty].    
     If a binding for [x] already exists in [ctx], that binding is overwritten
     with the new binding [x : ty]. *)
-let extend_ctx (ctx : context) (x : string) (ty : typ) : context = 
-  let new_ctx = List.filter (fun (x', _) -> not (String.equal x' x)) ctx in 
+let extend_ctx (ctx : context) (x : string) (ty : typ) : context =
+  let new_ctx = List.filter (fun (x', _) -> not (String.equal x' x)) ctx in
   List.rev ((x, ty) :: new_ctx)
 
 (** Exception to be thrown when:
@@ -100,7 +100,7 @@ let rec unify (t1 : typ) (t2 : typ) : sub =
   | TInt, TInt | TBool, TBool | TUnit, TUnit -> []
   | TVar x1, TVar x2 when x1 = x2 -> []
   | TVar x, tau ->
-    if not (occurs x tau) then [(x, tau)]
+    if not (occurs x tau) then [ (x, tau) ]
     else
       raise
         (TypeError
@@ -113,13 +113,6 @@ let rec unify (t1 : typ) (t2 : typ) : sub =
     let s1 = string_of_type t1 in
     let s2 = string_of_type t2 in
     raise (TypeError (Printf.sprintf "No solution for %s = %s\n" s1 s2))
-
-(** Robinson's algorithm -- applies [unify] to a list of equations
-    (represented as an association list containing pairs of [typ]s) *)    
-let rec robinson (eqs : (typ * typ) list) : sub =
-  match eqs with
-  | [] -> []
-  | (t1, t2) :: rest -> compose_subst (unify t1 t2) (robinson rest)
 
 (** Looks-up a variable in the context, returning its type.
     Raises [TypeError] if the variable is not found. *)
@@ -142,22 +135,25 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
   | Int n -> (TInt, [])
   | Null -> (TUnit, [])
   | Var x -> (lookup ctx x, [])
-  | App (e0, e1) -> 
-    let (tau0, s0) = infer ctx e0 in 
-    let (tau1, s1) = infer ctx e1 in 
+  | App (e0, e1) ->
+    let tau0, s0 = infer ctx e0 in
+    let tau1, s1 = infer ctx e1 in
     (* Generate a fresh variable [T] *)
-    let t = fresh_var () in 
+    let t = fresh_var () in
     (* Unify the equation [τ₀ = τ₁ -> T] *)
-    let sub = unify tau0 (TFun (tau1, t)) in 
+    let sub = unify tau0 (TFun (tau1, t)) in
     (t, sub)
-  | Lambda (x, e) -> 
-    (* Generate a fresh type variable [T], then infer a type for the body [e] 
-       in the extended context [ctx, x : T] *)
-    let t = fresh_var () in 
-    let extended_ctx = extend_ctx ctx x t in 
-    let (tau', s) = infer extended_ctx e in 
+  | Lambda (x, e) ->
+    (* Generate a fresh type variable [T], then infer a type for the body [e] in
+       the extended context [ctx, x : T] *)
+    let t = fresh_var () in
+    let extended_ctx = extend_ctx ctx x t in
+    let tau', s = infer extended_ctx e in
     (TFun (t, tau'), s)
-  | _ -> failwith "TODO"
+  | If (e1, e2, e3) ->
+    failwith
+      "TODO: consult figure 22-1 in Pierce textbook (TAPL) to figure\n\
+      \    out how to handle fresh variables for each of the branches"
 
 (** Main typechecking function that returns the inferred type *)
 let typecheck (ctx : context) (e : expr) : typ =
