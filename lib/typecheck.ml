@@ -131,11 +131,12 @@ let rec lookup (ctx : context) (x : string) : typ =
  *)
 let rec infer (ctx : context) (e : expr) : typ * sub =
   match e with
-  | Bool b -> (TBool, [])
-  | Int n -> (TInt, [])
+  | Bool _ -> (TBool, [])
+  | Int _ -> (TInt, [])
   | Null -> (TUnit, [])
   | Var x -> (lookup ctx x, [])
   | App (e0, e1) ->
+    (* TODO: figure out what to do with [s0] and [s1] *)
     let tau0, s0 = infer ctx e0 in
     let tau1, s1 = infer ctx e1 in
     (* Generate a fresh variable [T] *)
@@ -150,7 +151,7 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
     let extended_ctx = extend_ctx ctx x t in
     let tau', s = infer extended_ctx e in
     (TFun (t, tau'), s)
-  | If (e1, e2, e3) ->
+  | If (_e1, _e2, _e3) ->
     failwith
       "TODO: consult figure 22-1 in Pierce textbook (TAPL) to figure\n\
       \    out how to handle fresh variables for each of the branches"
@@ -169,15 +170,15 @@ let typecheck (ctx : context) (e : expr) : typ =
 (************************************************************)
 
 (* in utop: #use "typecheck.ml";; *)
-let tru = Bool true
-let fls = Bool false
-let int5 = Int 5
-let int42 = Int 42
-let x = Var "x"
-let y = Var "y"
-let id = Lambda ("x", Var "x")
-let if_int = If (tru, Int 42, Int 5)
-let if_fun = If (tru, id, id)
+let _tru = Bool true
+let _fls = Bool false
+let _int5 = Int 5
+let _int42 = Int 42
+let _x = Var "x"
+let _y = Var "y"
+let _id = Lambda ("x", Var "x")
+let _if_int = If (_tru, Int 42, Int 5)
+let _if_fun = If (_tru, _id, _id)
 
-let foo1 =
+let _foo1 =
   Lambda ("f", Lambda ("g", Lambda ("x", App (Var "f", App (Var "g", Var "x")))))
