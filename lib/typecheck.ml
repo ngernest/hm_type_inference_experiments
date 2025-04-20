@@ -20,13 +20,21 @@ type expr =
   | App of expr * expr
   | If of expr * expr * expr
 
+(** A typing context is a map from variable names to types, implemented as an 
+    association list *)  
 type context = (string * typ) list
 
+(** Exception to be thrown when:
+    - a variable doesn't exist in a typing context
+    - two types can't be unified 
+    - a type can't be inferred for an expression *)
 exception TypeError of string
 
-(* generates fresh type variable *)
+(** Mutable variable storing the (integer) value of the next 
+    fresh type variable *)
 let next_var_id : int ref = ref 0
 
+(** Generates a fresh type variable *)
 let fresh_var () : typ =
   let id = !next_var_id in
   incr next_var_id;
@@ -54,18 +62,23 @@ let rec occurs (var_id : int) (t : typ) : bool =
   | TFun (t1, t2) -> occurs var_id t1 || occurs var_id t2
   | _ -> false
 
-(** represent substitutions as lists of bindings (pairs) btwn type variables
-   (ints) and types *)
+(** A substitution is an association list that maps type variables (ints) to 
+    types *)
 type sub = (int * typ) list
 
-(** applies a substitution to a type *)
+(** Applies a substitution to a type: [apply_subst subst t] replaces
+    all type variables inside the type [t] with the result of 
+    the substitution [subst] *)
 let rec apply_subst (subst : sub) (t : typ) : typ =
   match t with
   | TVar n -> ( try List.assoc n subst with Not_found -> t)
   | TFun (t1, t2) -> TFun (apply_subst subst t1, apply_subst subst t2)
   | _ -> t
 
-(** composes substitutions *)
+(** Composes two substitutions: [compose_subst s1 s2] applies 
+    [s1] to every type in the image of [s2], then unions [s1, s2] together.
+    - If the same type variable [var] appears in both [s1] and [s2], the binding 
+    for [var] in s1 is preserved. *)
 let compose_subst (s1 : sub) (s2 : sub) : sub =
   let s2' = List.map (fun (var, t) -> (var, apply_subst s1 t)) s2 in
   s1 @ List.filter (fun (var, _) -> not (List.mem_assoc var s1)) s2'
@@ -74,7 +87,18 @@ let compose_subst (s1 : sub) (s2 : sub) : sub =
 
 (** Implementation of Robinson's unification algorithm. Returns a substitution 
     that most weakly unifies the constraint (t1 = t2) for types t1, t2. *)
-let rec unify t1 t2 : sub = failwith "not implemented"
+let rec unify (t1 : typ) (t2 : typ) : sub = 
+  match t1, t2 with 
+  | TInt, TInt | TBool, TBool | TUnit, TUnit -> []
+  | TVar x1, TVar x2 when x1 = x2 -> []
+  | TVar x, _ -> [(x, t2)]
+  | TFun (tau1, tau2), TFun (tau1', tau2') -> 
+    (* TODO: need to check this case *)
+    compose_subst (unify tau1 tau1') (unify tau2 tau2')
+  | _ -> 
+    let s1 = string_of_type t1 in 
+    let s2 = string_of_type t2 in 
+    raise (TypeError (Printf.sprintf "No solution for %s = %s\n" s1 s2))
 
 (** Looks-up a variable in the context, returning its type.
     Raises [TypeError] if the variable is not found. *)
