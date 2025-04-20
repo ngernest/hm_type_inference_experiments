@@ -10,7 +10,7 @@ type typ =
   | TFun of typ * typ
   | TVar of int (* type variable for inference *)
 
-(** Simply-typed lambda calculus with ints, bools and null *)
+(** Simply-typed lambda calculus with ints, bools and null (the unit value) *)
 type expr =
   | Var of string
   | Int of int
@@ -92,7 +92,12 @@ let rec lookup (ctx : context) (x : string) : typ =
  *    satisfied for e to be of type t.
  *)
 let rec infer (ctx : context) (e : expr) : typ * sub =
-  failwith "not implemented"
+  match e with 
+  | Bool b -> (TBool, [])
+  | Int n -> (TInt, [])
+  | Null -> (TUnit, [])
+  | Var x -> (lookup ctx x, [])
+  | _ -> failwith "TODO"
 
 (** Main typechecking function that returns the inferred type *)
 let typecheck (ctx : context) (e : expr) : typ =

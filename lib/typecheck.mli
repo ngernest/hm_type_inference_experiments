@@ -1,3 +1,5 @@
+(** Syntax of types: int, bool, unit, function types and type variables
+    (indexed with natural numbers) *)
 type typ =
   | TInt
   | TBool
@@ -5,6 +7,7 @@ type typ =
   | TFun of typ * typ
   | TVar of int
 
+(** Simply-typed lambda calculus with ints, bools and null (the unit value) *)  
 type expr =
   | Var of string
   | Int of int
