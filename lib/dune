@@ -1,8 +1,9 @@
 (library
  (name typecheck))
 
-;; TODO: remove these compiler flags
+;; TODO: remove these compiler flags before submission
+
 (env
  (dev
   (flags
-   (:standard -g -w "-27-39")))) 
+   (:standard -g -w "-27-39"))))
