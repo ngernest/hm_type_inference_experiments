@@ -136,14 +136,15 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
   | Null -> (TUnit, [])
   | Var x -> (lookup ctx x, [])
   | App (e0, e1) ->
-    (* TODO: figure out what to do with [s0] and [s1] *)
     let tau0, s0 = infer ctx e0 in
     let tau1, s1 = infer ctx e1 in
     (* Generate a fresh variable [T] *)
     let t = fresh_var () in
     (* Unify the equation [τ₀ = τ₁ -> T] *)
     let sub = unify tau0 (TFun (tau1, t)) in
-    (t, sub)
+    (* TODO: not sure if combining all the substs in this way is right *)
+    let final_sub = compose_subst sub (compose_subst s1 s0) in 
+    (t, final_sub)
   | Lambda (x, e) ->
     (* Generate a fresh type variable [T], then infer a type for the body [e] in
        the extended context [ctx, x : T] *)
