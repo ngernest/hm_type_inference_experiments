@@ -39,6 +39,12 @@ val fresh_var : unit -> typ
 (** converts a type to string for display *)
 val string_of_type : typ -> string
 
+(** Helper function: pretty-prints an [expr] as a string *)
+val string_of_expr : expr -> string
+
+(** Helper function: pretty-prints a context *)
+val string_of_ctx : context -> string
+
 (** Checks if a type variable occurs in a type *)
 val occurs : int -> typ -> bool
 
@@ -75,3 +81,16 @@ val infer : context -> expr -> typ * sub
 
 (** Main typechecking function that returns the inferred type *)
 val typecheck : context -> expr -> typ
+
+(** Helper function for running the unit tests below:
+    - Resets [next_var_id := 0] when typechecking a new term
+    - If the term typechecks succesfully, prints out [ctx ⊢ e : ty], 
+      using the dedicated pretty-printing functions for 
+      [expr], [context] and [typ] *)
+val top_level_typechecker : context -> expr -> unit
+
+(** For each of the example terms above, infer a type for them in the empty 
+    context and typechecks the term, printing out the final type. 
+    - Note: [x] and [y] are omitted since they can't be typechecked in the
+      in the empty context  *)
+val run_tests : unit -> unit

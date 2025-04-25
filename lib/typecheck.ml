@@ -63,6 +63,31 @@ let rec string_of_type (t : typ) : string =
     (* 'a, 'b, ... *)
     "'" ^ String.make 1 (Char.chr (97 + (n mod 26)))
 
+(** Helper function: pretty-prints an [expr] as a string *)
+let rec string_of_expr (e : expr) : string =
+  match e with
+  | Var x -> x
+  | Int i -> string_of_int i
+  | Bool b -> string_of_bool b
+  | Null -> "null"
+  | Lambda (x, e') -> Printf.sprintf "λ%s. %s" x (string_of_expr e')
+  | App (e1, e2) ->
+    let s1 = string_of_expr e1 in
+    let s2 = string_of_expr e2 in
+    Printf.sprintf "(%s %s)" s1 s2
+  | If (e1, e2, e3) ->
+    let s1 = string_of_expr e1 in
+    let s2 = string_of_expr e2 in
+    let s3 = string_of_expr e3 in
+    Printf.sprintf "if %s then %s else %s" s1 s2 s3
+
+(** Helper function: pretty-prints a context *)
+let rec string_of_ctx (ctx : context) : string =
+  match ctx with
+  | [] -> "∅"
+  | (x, ty) :: ctx' ->
+    Printf.sprintf "%s : %s, %s" x (string_of_type ty) (string_of_ctx ctx')
+
 (** Checks if a type variable occurs in a type *)
 let rec occurs (var_id : int) (t : typ) : bool =
   match t with
@@ -93,8 +118,8 @@ let compose_subst (s1 : sub) (s2 : sub) : sub =
 
 (** For brevity, we define an infix operator for [compose_subst], 
     where [s1 <.> s2] means [compose_subst s1 s2]. Note that [<.>]
-    is left-associative.  *)  
-let (<.>) (s1 : sub) (s2 : sub) : sub = compose_subst s1 s2  
+    is left-associative.  *)
+let ( <.> ) (s1 : sub) (s2 : sub) : sub = compose_subst s1 s2
 
 (* TODO: implement unification *)
 
@@ -146,8 +171,7 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
     let t = fresh_var () in
     (* Unify the equation [τ₀ = τ₁ -> T] *)
     let s2 = unify tau0 (TFun (tau1, t)) in
-    (* TODO: not sure if combining all the substs in this way is right *)
-    let final_subst = compose_subst s2 (compose_subst s1 s0) in 
+    let final_subst = compose_subst s2 (compose_subst s1 s0) in
     (t, final_subst)
   | Lambda (x, e) ->
     (* Generate a fresh type variable [T], then infer a type for the body [e] in
@@ -157,12 +181,12 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
     let tau', s = infer extended_ctx e in
     (TFun (t, tau'), s)
   | If (e1, e2, e3) ->
-    let (t1, s1) = infer ctx e1 in 
-    let (t2, s2) = infer ctx e2 in 
-    let (t3, s3) = infer ctx e3 in 
-    let s4 = unify t1 TBool in 
-    let s5 = unify t2 t3 in 
-    let final_subst = s5 <.> s4 <.> s3 <.> s2 <.> s1 in 
+    let t1, s1 = infer ctx e1 in
+    let t2, s2 = infer ctx e2 in
+    let t3, s3 = infer ctx e3 in
+    let s4 = unify t1 TBool in
+    let s5 = unify t2 t3 in
+    let final_subst = s5 <.> s4 <.> s3 <.> s2 <.> s1 in
     (t2, final_subst)
 
 (** Main typechecking function that returns the inferred type *)
@@ -188,31 +212,40 @@ let y = Var "y"
 let id = Lambda ("x", Var "x")
 let if_int = If (tru, Int 42, Int 5)
 
-(** - [inferred_type] = [5 -> 5]
-    - [subst] = [5 |-> 6]
-    - so [inferred_type] simplifies to [6 -> 6]
-    - this is equivalent ot the type that OCaml infers for [if_fun_ocaml] 
-      below, that is ['a -> 'a]
-*)
+(** This term is [if_fun = if true then λx. x else λx. x]. 
+    Our code infers the type ['b -> 'b] for this term. 
+    This is equivalent to the type that OCaml infers for [if_fun_ocaml], 
+    which is ['a -> 'a]. *)
 let if_fun = If (tru, id, id)
 
-let id_ocaml = fun x -> x  
+let id_ocaml x = x
 let if_fun_ocaml = if true then id_ocaml else id_ocaml
 
-(** [foo1 = λf. λg. λx. f (g x)].         
-     - [inferred_type = TFun (TVar 0, TFun (TVar 1, TFun (TVar 2, TVar 4))) ]
-    - [subst = [(0, TFun (TVar 3, TVar 4)); (1, TFun (TVar 2, TVar 3))]]
-
-    which simplifies to:
-    - [inferred_type = 0 -> (1 -> (2 -> 4))]
-    - [subst = [0 |-> (3 -> 4), 1 |-> (2 -> 3)]]
-
-    so [inferred_type] becomes [(3 -> 4) -> (2 -> 3) -> (2 -> 4)], 
-    which is alpha-equivalent to the type that OCaml infers 
+(** This term is [foo1 = λf. λg. λx. f (g x)].         
+    The inferred type is [('d -> 'e) -> ('c -> 'd) -> 'c -> 'e], 
+    which is equivalent to the type that OCaml infers 
     for the term [foo1_ocaml] below, that is 
-    [('a -> 'b) -> ('c -> 'a) -> 'c -> 'b]
-*)
+    [('a -> 'b) -> ('c -> 'a) -> 'c -> 'b]. *)
 let foo1 : expr =
   Lambda ("f", Lambda ("g", Lambda ("x", App (Var "f", App (Var "g", Var "x")))))
 
-let foo1_ocaml = fun f -> fun g -> fun x -> f (g x)  
+let foo1_ocaml f g x = f (g x)
+
+(** Helper function for running the unit tests below:
+    - Resets [next_var_id := 0] when typechecking a new term
+    - If the term typechecks succesfully, prints out [ctx ⊢ e : ty], 
+      using the dedicated pretty-printing functions for 
+      [expr], [context] and [typ] *)
+let top_level_typechecker (ctx : context) (e : expr) : unit =
+  next_var_id := 0;
+  let ty = typecheck ctx e in
+  Printf.eprintf "%s ⊢ %s : %s\n" (string_of_ctx ctx) (string_of_expr e)
+    (string_of_type ty)
+
+(** For each of the example terms above, infer a type for them in the empty 
+    context and typechecks the term, printing out the final type. 
+    - Note: [x] and [y] are omitted since they can't be typechecked in the
+      in the empty context  *)
+let run_tests () =
+  List.iter (top_level_typechecker [])
+    [ tru; fls; int5; int42; id; if_int; if_fun; foo1 ]

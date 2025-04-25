@@ -1,3 +1,3 @@
 open! Typecheck
 
-let () = print_endline "Hello, World!"
+let () = run_tests ()
