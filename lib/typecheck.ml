@@ -91,6 +91,11 @@ let compose_subst (s1 : sub) (s2 : sub) : sub =
   let s2' = List.map (fun (var, t) -> (var, apply_subst s1 t)) s2 in
   s1 @ List.filter (fun (var, _) -> not (List.mem_assoc var s1)) s2'
 
+(** For brevity, we define an infix operator for [compose_subst], 
+    where [s1 <.> s2] means [compose_subst s1 s2]. Note that [<.>]
+    is left-associative.  *)  
+let (<.>) (s1 : sub) (s2 : sub) : sub = compose_subst s1 s2  
+
 (* TODO: implement unification *)
 
 (** Implementation of Robinson's unification algorithm. Returns a substitution 
@@ -141,10 +146,10 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
     (* Generate a fresh variable [T] *)
     let t = fresh_var () in
     (* Unify the equation [τ₀ = τ₁ -> T] *)
-    let sub = unify tau0 (TFun (tau1, t)) in
+    let s2 = unify tau0 (TFun (tau1, t)) in
     (* TODO: not sure if combining all the substs in this way is right *)
-    let final_sub = compose_subst sub (compose_subst s1 s0) in 
-    (t, final_sub)
+    let final_subst = compose_subst s2 (compose_subst s1 s0) in 
+    (t, final_subst)
   | Lambda (x, e) ->
     (* Generate a fresh type variable [T], then infer a type for the body [e] in
        the extended context [ctx, x : T] *)
@@ -152,10 +157,14 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
     let extended_ctx = extend_ctx ctx x t in
     let tau', s = infer extended_ctx e in
     (TFun (t, tau'), s)
-  | If (_e1, _e2, _e3) ->
-    failwith
-      "TODO: consult figure 22-1 in Pierce textbook (TAPL) to figure\n\
-      \    out how to handle fresh variables for each of the branches"
+  | If (e1, e2, e3) ->
+    let (t1, s1) = infer ctx e1 in 
+    let (t2, s2) = infer ctx e2 in 
+    let (t3, s3) = infer ctx e3 in 
+    let s4 = unify t1 TBool in 
+    let s5 = unify t2 t3 in 
+    let final_subst = s5 <.> s4 <.> s3 <.> s2 <.> s1 in 
+    (t2, final_subst)
 
 (** Main typechecking function that returns the inferred type *)
 let typecheck (ctx : context) (e : expr) : typ =
