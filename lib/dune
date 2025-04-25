@@ -1,4 +1,7 @@
 (library
  (name typecheck))
 
-
+(env
+ (dev
+  (flags
+   (:standard -g -w "-32"))))

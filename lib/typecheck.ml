@@ -112,7 +112,6 @@ let rec unify (t1 : typ) (t2 : typ) : sub =
            (Printf.sprintf "Type variable %d appears in %s\n" x
               (string_of_type tau)))
   | TFun (tau1, tau2), TFun (tau1', tau2') ->
-    (* TODO: need to check this case *)
     compose_subst (unify tau1 tau1') (unify tau2 tau2')
   | _ ->
     let s1 = string_of_type t1 in
@@ -180,15 +179,40 @@ let typecheck (ctx : context) (e : expr) : typ =
 (************************************************************)
 
 (* in utop: #use "typecheck.ml";; *)
-let _tru = Bool true
-let _fls = Bool false
-let _int5 = Int 5
-let _int42 = Int 42
-let _x = Var "x"
-let _y = Var "y"
-let _id = Lambda ("x", Var "x")
-let _if_int = If (_tru, Int 42, Int 5)
-let _if_fun = If (_tru, _id, _id)
+let tru = Bool true
+let fls = Bool false
+let int5 = Int 5
+let int42 = Int 42
+let x = Var "x"
+let y = Var "y"
+let id = Lambda ("x", Var "x")
+let if_int = If (tru, Int 42, Int 5)
 
-let _foo1 =
+(** - [inferred_type] = [5 -> 5]
+    - [subst] = [5 |-> 6]
+    - so [inferred_type] simplifies to [6 -> 6]
+    - this is equivalent ot the type that OCaml infers for [if_fun_ocaml] 
+      below, that is ['a -> 'a]
+*)
+let if_fun = If (tru, id, id)
+
+let id_ocaml = fun x -> x  
+let if_fun_ocaml = if true then id_ocaml else id_ocaml
+
+(** [foo1 = λf. λg. λx. f (g x)].         
+     - [inferred_type = TFun (TVar 0, TFun (TVar 1, TFun (TVar 2, TVar 4))) ]
+    - [subst = [(0, TFun (TVar 3, TVar 4)); (1, TFun (TVar 2, TVar 3))]]
+
+    which simplifies to:
+    - [inferred_type = 0 -> (1 -> (2 -> 4))]
+    - [subst = [0 |-> (3 -> 4), 1 |-> (2 -> 3)]]
+
+    so [inferred_type] becomes [(3 -> 4) -> (2 -> 3) -> (2 -> 4)], 
+    which is alpha-equivalent to the type that OCaml infers 
+    for the term [foo1_ocaml] below, that is 
+    [('a -> 'b) -> ('c -> 'a) -> 'c -> 'b]
+*)
+let foo1 : expr =
   Lambda ("f", Lambda ("g", Lambda ("x", App (Var "f", App (Var "g", Var "x")))))
+
+let foo1_ocaml = fun f -> fun g -> fun x -> f (g x)  
