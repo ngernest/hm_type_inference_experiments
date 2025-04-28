@@ -205,6 +205,7 @@ let typecheck (ctx : context) (e : expr) : typ =
 (* in utop: #use "typecheck.ml";; *)
 let tru = Bool true
 let fls = Bool false
+let null = Null
 let int5 = Int 5
 let int42 = Int 42
 let x = Var "x"
@@ -248,4 +249,4 @@ let top_level_typechecker (ctx : context) (e : expr) : unit =
       in the empty context  *)
 let run_tests () =
   List.iter (top_level_typechecker [])
-    [ tru; fls; int5; int42; id; if_int; if_fun; foo1 ]
+    [ tru; fls; null; int5; int42; id; if_int; if_fun; foo1 ]
