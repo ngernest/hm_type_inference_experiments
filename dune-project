@@ -1,6 +1,6 @@
 (lang dune 3.16)
 
-(name cs6110_hw5)
+(name typecheck)
 
 (generate_opam_files true)
 
@@ -16,7 +16,7 @@
 (documentation https://url/to/documentation)
 
 (package
- (name cs6110_hw5)
+ (name typecheck)
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends ocaml dune)
