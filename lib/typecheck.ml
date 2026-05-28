@@ -136,8 +136,17 @@ let rec unify (t1 : typ) (t2 : typ) : sub =
         (TypeError
            (Printf.sprintf "Type variable %d appears in %s\n" x
               (string_of_type tau)))
+  | tau, TVar x ->
+    if not (occurs x tau) then [ (x, tau) ]
+    else
+      raise
+        (TypeError
+           (Printf.sprintf "Type variable %d appears in %s\n" x
+              (string_of_type tau)))
   | TFun (tau1, tau2), TFun (tau1', tau2') ->
-    compose_subst (unify tau1 tau1') (unify tau2 tau2')
+    let s1 = unify tau1 tau1' in
+    let s2 = unify (apply_subst s1 tau2) (apply_subst s1 tau2') in
+    compose_subst s2 s1
   | _ ->
     let s1 = string_of_type t1 in
     let s2 = string_of_type t2 in
@@ -149,8 +158,6 @@ let rec lookup (ctx : context) (x : string) : typ =
   match ctx with
   | [] -> raise (TypeError ("Unbound variable: " ^ x))
   | (y, t) :: rest -> if x = y then t else lookup rest x
-
-(* TODO: implement inference *)
 
 (** Infers the type of expression e in context ctx via unification.
  *  Returns a pair (t, s) where:
@@ -167,27 +174,25 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
   | App (e0, e1) ->
     let tau0, s0 = infer ctx e0 in
     let tau1, s1 = infer ctx e1 in
-    (* Generate a fresh variable [T] *)
     let t = fresh_var () in
-    (* Unify the equation [τ₀ = τ₁ -> T] *)
-    let s2 = unify tau0 (TFun (tau1, t)) in
-    let final_subst = compose_subst s2 (compose_subst s1 s0) in
-    (t, final_subst)
+    let s01 = s1 <.> s0 in
+    let s2 = unify (apply_subst s01 tau0) (TFun (apply_subst s01 tau1, t)) in
+    (apply_subst s2 t, s2 <.> s01)
   | Lambda (x, e) ->
-    (* Generate a fresh type variable [T], then infer a type for the body [e] in
-       the extended context [ctx, x : T] *)
     let t = fresh_var () in
     let extended_ctx = extend_ctx ctx x t in
     let tau', s = infer extended_ctx e in
-    (TFun (t, tau'), s)
+    (TFun (apply_subst s t, tau'), s)
   | If (e1, e2, e3) ->
     let t1, s1 = infer ctx e1 in
     let t2, s2 = infer ctx e2 in
     let t3, s3 = infer ctx e3 in
-    let s4 = unify t1 TBool in
-    let s5 = unify t2 t3 in
-    let final_subst = s5 <.> s4 <.> s3 <.> s2 <.> s1 in
-    (t2, final_subst)
+    let s123 = s3 <.> s2 <.> s1 in
+    let s4 = unify (apply_subst s123 t1) TBool in
+    let s1234 = s4 <.> s123 in
+    let s5 = unify (apply_subst s1234 t2) (apply_subst s1234 t3) in
+    let final_subst = s5 <.> s1234 in
+    (apply_subst final_subst t2, final_subst)
 
 (** Main typechecking function that returns the inferred type *)
 let typecheck (ctx : context) (e : expr) : typ =
