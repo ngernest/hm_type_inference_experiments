@@ -1,6 +1,6 @@
-# CS 6110 HW5 code
+# Experiments with Generators for Hindley-Milner 
 
-The starter code provided is in [`lib/typecheck.ml`](./lib/typecheck.ml).
+See [`lib/typecheck.ml`](./lib/typecheck.ml).
 
 ## Compiling
 - Run `dune build` to compile
