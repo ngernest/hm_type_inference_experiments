@@ -1,8 +1,8 @@
 (* type inference for the lambda calculus using Robinson's unification
    algorithm *)
 
-(** Syntax of types: int, bool, unit, function types and type variables
-    (indexed with natural numbers) *)
+(** Syntax of types: int, bool, unit, function types and type variables (indexed
+    with natural numbers) *)
 type typ =
   | TInt
   | TBool
@@ -20,25 +20,25 @@ type expr =
   | App of expr * expr
   | If of expr * expr * expr
 
-(** A typing context is a map from variable names to types, implemented as an 
+(** A typing context is a map from variable names to types, implemented as an
     association list *)
 type context = (string * typ) list
 
-(** Helper function: extends a context [ctx] with a new binding [x : ty].    
-    If a binding for [x] already exists in [ctx], that binding is overwritten
-    with the new binding [x : ty]. *)
+(** Helper function: extends a context [ctx] with a new binding [x : ty]. If a
+    binding for [x] already exists in [ctx], that binding is overwritten with
+    the new binding [x : ty]. *)
 let extend_ctx (ctx : context) (x : string) (ty : typ) : context =
   let new_ctx = List.filter (fun (x', _) -> not (String.equal x' x)) ctx in
   List.rev ((x, ty) :: new_ctx)
 
 (** Exception to be thrown when:
     - a variable doesn't exist in a typing context
-    - two types can't be unified 
+    - two types can't be unified
     - a type can't be inferred for an expression *)
 exception TypeError of string
 
-(** Mutable variable storing the (integer) value of the next 
-    fresh type variable *)
+(** Mutable variable storing the (integer) value of the next fresh type variable
+*)
 let next_var_id : int ref = ref 0
 
 (** Generates a fresh type variable *)
@@ -72,9 +72,15 @@ let rec string_of_expr (e : expr) : string =
   | Null -> "null"
   | Lambda (x, e') -> Printf.sprintf "λ%s. %s" x (string_of_expr e')
   | App (e1, e2) ->
-    let s1 = string_of_expr e1 in
-    let s2 = string_of_expr e2 in
-    Printf.sprintf "(%s %s)" s1 s2
+    let s1 =
+      match e1 with
+      | Lambda _ | If _ -> Printf.sprintf "(%s)" (string_of_expr e1)
+      | _ -> string_of_expr e1 in
+    let s2 =
+      match e2 with
+      | App _ | Lambda _ | If _ -> Printf.sprintf "(%s)" (string_of_expr e2)
+      | _ -> string_of_expr e2 in
+    Printf.sprintf "%s %s" s1 s2
   | If (e1, e2, e3) ->
     let s1 = string_of_expr e1 in
     let s2 = string_of_expr e2 in
@@ -95,35 +101,34 @@ let rec occurs (var_id : int) (t : typ) : bool =
   | TFun (t1, t2) -> occurs var_id t1 || occurs var_id t2
   | _ -> false
 
-(** A substitution is an association list that maps type variables (ints) to 
+(** A substitution is an association list that maps type variables (ints) to
     types *)
 type sub = (int * typ) list
 
-(** Applies a substitution to a type: [apply_subst subst t] replaces
-    all type variables inside the type [t] with the result of 
-    the substitution [subst] *)
+(** Applies a substitution to a type: [apply_subst subst t] replaces all type
+    variables inside the type [t] with the result of the substitution [subst] *)
 let rec apply_subst (subst : sub) (t : typ) : typ =
   match t with
   | TVar n -> ( try List.assoc n subst with Not_found -> t)
   | TFun (t1, t2) -> TFun (apply_subst subst t1, apply_subst subst t2)
   | _ -> t
 
-(** Composes two substitutions: [compose_subst s1 s2] applies 
-    [s1] to every type in the image of [s2], then unions [s1, s2] together.
-    - If the same type variable [var] appears in both [s1] and [s2], the binding 
-    for [var] in s1 is preserved. *)
+(** Composes two substitutions: [compose_subst s1 s2] applies [s1] to every type
+    in the image of [s2], then unions [s1, s2] together.
+    - If the same type variable [var] appears in both [s1] and [s2], the binding
+      for [var] in s1 is preserved. *)
 let compose_subst (s1 : sub) (s2 : sub) : sub =
   let s2' = List.map (fun (var, t) -> (var, apply_subst s1 t)) s2 in
   s1 @ List.filter (fun (var, _) -> not (List.mem_assoc var s1)) s2'
 
-(** For brevity, we define an infix operator for [compose_subst], 
-    where [s1 <.> s2] means [compose_subst s1 s2]. Note that [<.>]
-    is left-associative.  *)
+(** For brevity, we define an infix operator for [compose_subst], where
+    [s1 <.> s2] means [compose_subst s1 s2]. Note that [<.>] is
+    left-associative. *)
 let ( <.> ) (s1 : sub) (s2 : sub) : sub = compose_subst s1 s2
 
 (* TODO: implement unification *)
 
-(** Implementation of Robinson's unification algorithm. Returns a substitution 
+(** Implementation of Robinson's unification algorithm. Returns a substitution
     that most weakly unifies the constraint (t1 = t2) for types t1, t2. *)
 let rec unify (t1 : typ) (t2 : typ) : sub =
   match (t1, t2) with
@@ -145,19 +150,17 @@ let rec unify (t1 : typ) (t2 : typ) : sub =
     let s2 = string_of_type t2 in
     raise (TypeError (Printf.sprintf "No solution for %s = %s\n" s1 s2))
 
-(** Looks-up a variable in the context, returning its type.
-    Raises [TypeError] if the variable is not found. *)
+(** Looks-up a variable in the context, returning its type. Raises [TypeError]
+    if the variable is not found. *)
 let rec lookup (ctx : context) (x : string) : typ =
   match ctx with
   | [] -> raise (TypeError ("Unbound variable: " ^ x))
   | (y, t) :: rest -> if x = y then t else lookup rest x
 
-(** Infers the type of expression e in context ctx via unification.
- *  Returns a pair (t, s) where:
- *  - t is the inferred type of e
- *  - s is a substitution containing all the constraints that must be 
- *    satisfied for e to be of type t.
- *)
+(** Infers the type of expression e in context ctx via unification. * Returns a
+    pair (t, s) where: * - t is the inferred type of e * - s is a substitution
+    containing all the constraints that must be * satisfied for e to be of type
+    t. *)
 let rec infer (ctx : context) (e : expr) : typ * sub =
   match e with
   | Bool _ -> (TBool, [])
@@ -172,16 +175,17 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
     (* Compose the two substitutions that we've gotten so far *)
     let s01 = s1 <.> s0 in
     (* Unify the equation [s01(τ₀) = s01(τ₁) -> T], getting a new subst [s2]
-      Here we need to manually propagate the constraints further *)
+       Here we need to manually propagate the constraints further *)
     let s2 = unify (apply_subst s01 tau0) (TFun (apply_subst s01 tau1, t)) in
-    (* Then apply [s2] to the fresh type variable [T], and compose [s2] with [s01] *)
+    (* Then apply [s2] to the fresh type variable [T], and compose [s2] with
+       [s01] *)
     (apply_subst s2 t, s2 <.> s01)
   | Lambda (x, e) ->
     let t = fresh_var () in
     let extended_ctx = extend_ctx ctx x t in
     let tau', s = infer extended_ctx e in
-    (* Note that we have to apply the final substitution
-       to the fresh type variable [t] *)
+    (* Note that we have to apply the final substitution to the fresh type
+       variable [t] *)
     (TFun (apply_subst s t, tau'), s)
   | If (e1, e2, e3) ->
     let t1, s1 = infer ctx e1 in
@@ -218,19 +222,17 @@ let y = Var "y"
 let id = Lambda ("x", Var "x")
 let if_int = If (tru, Int 42, Int 5)
 
-(** This term is [if_fun = if true then λx. x else λx. x]. 
-    Our code infers the type ['b -> 'b] for this term. 
-    This is equivalent to the type that OCaml infers for [if_fun_ocaml], 
-    which is ['a -> 'a]. *)
+(** This term is [if_fun = if true then λx. x else λx. x]. Our code infers the
+    type ['b -> 'b] for this term. This is equivalent to the type that OCaml
+    infers for [if_fun_ocaml], which is ['a -> 'a]. *)
 let if_fun = If (tru, id, id)
 
 let id_ocaml x = x
 let if_fun_ocaml = if true then id_ocaml else id_ocaml
 
-(** This term is [foo1 = λf. λg. λx. f (g x)].         
-    The inferred type is [('d -> 'e) -> ('c -> 'd) -> 'c -> 'e], 
-    which is equivalent to the type that OCaml infers 
-    for the term [foo1_ocaml] below, that is 
+(** This term is [foo1 = λf. λg. λx. f (g x)]. The inferred type is
+    [('d -> 'e) -> ('c -> 'd) -> 'c -> 'e], which is equivalent to the type that
+    OCaml infers for the term [foo1_ocaml] below, that is
     [('a -> 'b) -> ('c -> 'a) -> 'c -> 'b]. *)
 let foo1 : expr =
   Lambda ("f", Lambda ("g", Lambda ("x", App (Var "f", App (Var "g", Var "x")))))
@@ -239,19 +241,41 @@ let foo1_ocaml f g x = f (g x)
 
 (** Helper function for running the unit tests below:
     - Resets [next_var_id := 0] when typechecking a new term
-    - If the term typechecks succesfully, prints out [ctx ⊢ e : ty], 
-      using the dedicated pretty-printing functions for 
-      [expr], [context] and [typ] *)
+    - If the term typechecks succesfully, prints out [ctx ⊢ e : ty], using the
+      dedicated pretty-printing functions for [expr], [context] and [typ] *)
 let top_level_typechecker (ctx : context) (e : expr) : unit =
   next_var_id := 0;
   let ty = typecheck ctx e in
   Printf.eprintf "%s ⊢ %s : %s\n" (string_of_ctx ctx) (string_of_expr e)
     (string_of_type ty)
 
-(** For each of the example terms above, infer a type for them in the empty 
-    context and typechecks the term, printing out the final type. 
-    - Note: [x] and [y] are omitted since they can't be typechecked in the
-      in the empty context  *)
+(** [(λx. x) 5 : int] — applying the identity function to an int *)
+let identity_app = App (id, Int 5)
+
+(** [(λx. λy. x) 5 : 'b -> int] — partial application of a constant function *)
+let lambda_true_app = App (Lambda ("x", Lambda ("y", Var "x")), Int 5)
+
+(** [if true then (λx. x) else (λx. 5) : int -> int] — unifying branch types
+    forces the identity's type variable to int *)
+let if_unify_branches = If (tru, id, Lambda ("x", Int 5))
+
+(** For each of the example terms above, infer a type for them in the empty
+    context and typechecks the term, printing out the final type.
+    - Note: [x] and [y] are omitted since they can't be typechecked in the in
+      the empty context *)
 let run_tests () =
   List.iter (top_level_typechecker [])
-    [ tru; fls; null; int5; int42; id; if_int; if_fun; foo1 ]
+    [
+      tru;
+      fls;
+      null;
+      int5;
+      int42;
+      id;
+      if_int;
+      if_fun;
+      foo1;
+      identity_app;
+      lambda_true_app;
+      if_unify_branches;
+    ]
