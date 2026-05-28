@@ -129,14 +129,7 @@ let rec unify (t1 : typ) (t2 : typ) : sub =
   match (t1, t2) with
   | TInt, TInt | TBool, TBool | TUnit, TUnit -> []
   | TVar x1, TVar x2 when x1 = x2 -> []
-  | TVar x, tau ->
-    if not (occurs x tau) then [ (x, tau) ]
-    else
-      raise
-        (TypeError
-           (Printf.sprintf "Type variable %d appears in %s\n" x
-              (string_of_type tau)))
-  | tau, TVar x ->
+  | TVar x, tau | tau, TVar x ->
     if not (occurs x tau) then [ (x, tau) ]
     else
       raise
@@ -146,7 +139,7 @@ let rec unify (t1 : typ) (t2 : typ) : sub =
   | TFun (tau1, tau2), TFun (tau1', tau2') ->
     let s1 = unify tau1 tau1' in
     let s2 = unify (apply_subst s1 tau2) (apply_subst s1 tau2') in
-    compose_subst s2 s1
+    s2 <.> s1
   | _ ->
     let s1 = string_of_type t1 in
     let s2 = string_of_type t2 in
@@ -174,14 +167,21 @@ let rec infer (ctx : context) (e : expr) : typ * sub =
   | App (e0, e1) ->
     let tau0, s0 = infer ctx e0 in
     let tau1, s1 = infer ctx e1 in
+    (* Generate a fresh variable [T] *)
     let t = fresh_var () in
+    (* Compose the two substitutions that we've gotten so far *)
     let s01 = s1 <.> s0 in
+    (* Unify the equation [s01(τ₀) = s01(τ₁) -> T], getting a new subst [s2]
+      Here we need to manually propagate the constraints further *)
     let s2 = unify (apply_subst s01 tau0) (TFun (apply_subst s01 tau1, t)) in
+    (* Then apply [s2] to the fresh type variable [T], and compose [s2] with [s01] *)
     (apply_subst s2 t, s2 <.> s01)
   | Lambda (x, e) ->
     let t = fresh_var () in
     let extended_ctx = extend_ctx ctx x t in
     let tau', s = infer extended_ctx e in
+    (* Note that we have to apply the final substitution
+       to the fresh type variable [t] *)
     (TFun (apply_subst s t, tau'), s)
   | If (e1, e2, e3) ->
     let t1, s1 = infer ctx e1 in
